@@ -12,14 +12,12 @@ class RadHARDataset(Dataset):
         frame_divider = FrameDivider(config_radhar_dataset["n_chunk"], config_radhar_dataset["n_frame_per_chunk"])
         self.idx2label = ["boxing", "jack", "jump", "squats", "walk"]
         self.label2idx = { key: idx for idx, key in enumerate(self.idx2label)}
-        eye = np.eye(len(self.idx2label), dtype=float_t)
         raw_data = self.readAllData(root)
-        self.label: list[np.ndarray] = []
+        self.label: list[int] = []
         self.data: list[list[np.ndarray]] = []
         for dir, data_list in raw_data.items():
-            onehot = eye[self.label2idx[dir]]
             for data in data_list:
-                self.label.append(onehot)
+                self.label.append(self.label2idx[dir])
                 self.data.append(frame_divider.divide(data))
         self.transform = transform
 

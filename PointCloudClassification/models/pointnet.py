@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from models.mlp import MLP, MLPConv1D
+from config import device
 
 
 class TNet(nn.Module):
@@ -9,7 +10,7 @@ class TNet(nn.Module):
         self.n_channel = n_channel
         self.mlp_conv = MLPConv1D(layers=[n_channel, 64, 128, 1024])
         self.mlp = MLP(layers=[1024, 512, 256, n_channel*n_channel])
-        self.I = torch.eye(n_channel)
+        self.I = torch.eye(n_channel).to(device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x.shape = (n_batch, n_point, n_channel)
