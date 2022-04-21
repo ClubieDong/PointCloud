@@ -1,30 +1,32 @@
 import os
 import pickle
 import numpy as np
+import torch
 from torch.utils.data import Dataset
+from transforms.resampler import RandomResampler
 from transforms.transforms import Transform
-from transforms.frame_divider import FrameDivider
 from config import float_t, config_radhar_dataset
 
 
 class RadHARDataset(Dataset):
-    def __init__(self, root: str, transform: Transform):
-        frame_divider = FrameDivider(config_radhar_dataset["n_chunk"], config_radhar_dataset["n_frame_per_chunk"])
-        self.idx2label = ["boxing", "jack", "jump", "squats", "walk"]
-        self.label2idx = { key: idx for idx, key in enumerate(self.idx2label)}
+    def __init__(self, root: str):
+        self.transform = Transform()
+        self.transform.resampler = RandomResampler(config_radhar_dataset["n_sample_per_chunk"])
         raw_data = self.readAllData(root)
+        self.idx2label = raw_data.keys()
+        self.label2idx = { key: idx for idx, key in enumerate(self.idx2label)}
         self.label: list[int] = []
         self.data: list[list[np.ndarray]] = []
         for dir, data_list in raw_data.items():
             for data in data_list:
-                self.label.append(self.label2idx[dir])
-                self.data.append(frame_divider.divide(data))
-        self.transform = transform
+                divided_data = self.frameDivider(data)
+                self.label += [self.label2idx[dir]] * len(divided_data)
+                self.data += divided_data
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, idx) -> tuple[np.ndarray, np.ndarray]:
+    def __getitem__(self, idx) -> tuple[torch.Tensor, int]:
         return self.transform.transform(self.data[idx]), self.label[idx]
 
     def readFile(self, path: str) -> list[np.ndarray]:
@@ -73,3 +75,16 @@ class RadHARDataset(Dataset):
         with open(os.path.join(root, "data.pickle"), "wb") as f:
             pickle.dump(result, f)
         return result
+
+    def frameDivider(self, data: list[np.ndarray]) -> list[list[np.ndarray]]:
+        n_frame_per_chunk = config_radhar_dataset["n_frame_per_chunk"]
+        n_chunk_per_data = config_radhar_dataset["n_chunk_per_data"]
+        chunks: list[np.ndarray] = []
+        for idx in range(0, len(data), n_frame_per_chunk):
+            if idx + n_frame_per_chunk <= len(data):
+                chunks.append(np.vstack(data[idx:idx+n_frame_per_chunk]))
+        dividedData: list[list[np.ndarray]] = []
+        for idx in range(0, len(chunks)):
+            if idx + n_chunk_per_data <= len(chunks):
+                dividedData.append(chunks[idx:idx+n_chunk_per_data])
+        return dividedData

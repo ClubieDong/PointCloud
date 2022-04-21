@@ -1,6 +1,4 @@
 from datasets.RadHAR import RadHARDataset
-from transforms.transforms import Transform
-from transforms.resampler import RandomResampler
 from torch.utils.data import DataLoader
 from config import config_radhar_dataset, device
 from models.classifier import Classifier
@@ -8,15 +6,16 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-transfrom = Transform()
-transfrom.resampler = RandomResampler(config_radhar_dataset["n_sample_per_chunk"])
-train_dataset = DataLoader(RadHARDataset("RadHAR/Data/Train", transfrom), batch_size=4, shuffle=True)
-test_dataset = DataLoader(RadHARDataset("RadHAR/Data/Test", transfrom), batch_size=4, shuffle=True)
-model = Classifier(n_in_channel=8, n_chunk=config_radhar_dataset["n_chunk"], n_class=5).to(device)
+train_dataset = DataLoader(RadHARDataset("RadHAR/Data/Train"), batch_size=128, shuffle=True)
+test_dataset = DataLoader(RadHARDataset("RadHAR/Data/Test"), batch_size=128, shuffle=True)
+model = Classifier(n_in_channel=8, n_chunk=config_radhar_dataset["n_chunk_per_data"], n_class=5).to(device)
 loss_fn = nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
 
-print("Model size: ", sum(p.numel() for p in model.parameters() if p.requires_grad))
+print("Model size:", sum(p.numel() for p in model.parameters() if p.requires_grad))
+print("Train dataset size:", len(train_dataset.dataset))
+print("Test dataset size:", len(test_dataset.dataset))
+
 for epoch_idx in range(100):
     # Train
     model.train()
