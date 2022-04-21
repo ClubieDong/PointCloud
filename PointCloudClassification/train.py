@@ -6,8 +6,10 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
+# TODO: Set num_workers
 train_dataset = DataLoader(RadHARDataset("RadHAR/Data/Train"), batch_size=128, shuffle=True)
 test_dataset = DataLoader(RadHARDataset("RadHAR/Data/Test"), batch_size=128, shuffle=True)
+
 model = Classifier(n_in_channel=8, n_chunk=config_radhar_dataset["n_chunk_per_data"], n_class=5).to(device)
 loss_fn = nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)

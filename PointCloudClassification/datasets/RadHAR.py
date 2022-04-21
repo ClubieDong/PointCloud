@@ -3,15 +3,16 @@ import pickle
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from transforms.resampler import RandomResampler
-from transforms.transforms import Transform
+from transforms import Transform, Resampler, Translater, Scaler
 from config import float_t, config_radhar_dataset
 
 
 class RadHARDataset(Dataset):
     def __init__(self, root: str):
         self.transform = Transform()
-        self.transform.resampler = RandomResampler(config_radhar_dataset["n_sample_per_chunk"])
+        self.transform.resampler = Resampler(config_radhar_dataset["n_sample_per_chunk"])
+        self.transform.translater = Translater(config_radhar_dataset["translate_total_dist_std"], config_radhar_dataset["translate_point_dist_std"])
+        self.transform.scaler = Scaler(config_radhar_dataset["scale_factor_std"])
         raw_data = self.readAllData(root)
         self.idx2label = raw_data.keys()
         self.label2idx = { key: idx for idx, key in enumerate(self.idx2label)}
