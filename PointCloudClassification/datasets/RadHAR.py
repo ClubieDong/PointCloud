@@ -13,14 +13,14 @@ class RadHARDataset(Dataset):
         self.transform.resampler = Resampler(config_radhar_dataset["n_sample_per_chunk"])
         self.transform.translater = Translater(config_radhar_dataset["translate_total_dist_std"], config_radhar_dataset["translate_point_dist_std"])
         self.transform.scaler = Scaler(config_radhar_dataset["scale_factor_std"])
-        raw_data = self.readAllData(root)
+        raw_data = self.read_all_data(root)
         self.idx2label = raw_data.keys()
         self.label2idx = { key: idx for idx, key in enumerate(self.idx2label)}
         self.label: list[int] = []
         self.data: list[list[np.ndarray]] = []
         for dir, data_list in raw_data.items():
             for data in data_list:
-                divided_data = self.frameDivider(data)
+                divided_data = self.frame_divider(data)
                 self.label += [self.label2idx[dir]] * len(divided_data)
                 self.data += divided_data
 
@@ -30,7 +30,7 @@ class RadHARDataset(Dataset):
     def __getitem__(self, idx) -> tuple[torch.Tensor, int]:
         return self.transform.transform(self.data[idx]), self.label[idx]
 
-    def readFile(self, path: str) -> list[np.ndarray]:
+    def read_file(self, path: str) -> list[np.ndarray]:
         points: list[tuple[int, list[float]]] = []
         with open(path, "r") as f:
             read = lambda: f.readline().split(": ")[1]
@@ -62,7 +62,7 @@ class RadHARDataset(Dataset):
                 frame = []
         return data
 
-    def readAllData(self, root: str) -> dict[str, list[list[np.ndarray]]]:
+    def read_all_data(self, root: str) -> dict[str, list[list[np.ndarray]]]:
         list_dir = lambda path: (d for d in os.listdir(path) if not d.startswith("."))
         if os.path.exists(os.path.join(root, "data.pickle")):
             with open(os.path.join(root, "data.pickle"), "rb") as f:
@@ -71,21 +71,21 @@ class RadHARDataset(Dataset):
         for dir in list_dir(root):
             data: list[list[np.ndarray]] = []
             for file in list_dir(os.path.join(root, dir)):
-                data.append(self.readFile(os.path.join(root, dir, file)))
+                data.append(self.read_file(os.path.join(root, dir, file)))
             result[dir] = data
         with open(os.path.join(root, "data.pickle"), "wb") as f:
             pickle.dump(result, f)
         return result
 
-    def frameDivider(self, data: list[np.ndarray]) -> list[list[np.ndarray]]:
+    def frame_divider(self, data: list[np.ndarray]) -> list[list[np.ndarray]]:
         n_frame_per_chunk = config_radhar_dataset["n_frame_per_chunk"]
         n_chunk_per_data = config_radhar_dataset["n_chunk_per_data"]
         chunks: list[np.ndarray] = []
         for idx in range(0, len(data), n_frame_per_chunk):
             if idx + n_frame_per_chunk <= len(data):
                 chunks.append(np.vstack(data[idx:idx+n_frame_per_chunk]))
-        dividedData: list[list[np.ndarray]] = []
+        divided_data: list[list[np.ndarray]] = []
         for idx in range(0, len(chunks)):
             if idx + n_chunk_per_data <= len(chunks):
-                dividedData.append(chunks[idx:idx+n_chunk_per_data])
-        return dividedData
+                divided_data.append(chunks[idx:idx+n_chunk_per_data])
+        return divided_data
