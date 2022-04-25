@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import pytorch3d.ops
+from config import PointNetPPConfig
 from models.mlp import MLPConv1D
 
 
@@ -49,19 +50,13 @@ class SetAbstraction(nn.Module):
 
 
 class PointNetPP(nn.Module):
-    def __init__(self, 
-                 n_out_point_list: list[int],
-                 ball_query_n_sample_list: list[int],
-                 ball_query_radius_list: list[float],
-                 mlp_layers_list: list[list[int]],
-                 final_mlp_layers: list[int]):
+    def __init__(self, config: PointNetPPConfig):
         super().__init__()
-        self.sas = nn.ModuleList([
-            SetAbstraction(n_out_point, ball_query_n_sample, ball_query_radius, mlp_layers)
-            for n_out_point, ball_query_n_sample, ball_query_radius, mlp_layers
-            in zip(n_out_point_list, ball_query_n_sample_list, ball_query_radius_list, mlp_layers_list)
-        ])
-        self.final_mlp_conv = MLPConv1D(final_mlp_layers)
+        self.sas = nn.ModuleList(
+            SetAbstraction(cfg.n_out_point, cfg.ball_query_n_sample, cfg.ball_query_radius, cfg.mlp_layers)
+            for cfg in config.set_abstractions
+        )
+        self.final_mlp_conv = MLPConv1D(config.final_mlp_layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x.shape = (n_batch, n_in_point, n_in_channel)

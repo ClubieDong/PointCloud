@@ -5,28 +5,34 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from transforms import Transform, Resampler, Translater, Scaler
-from config import config_pantomime_dataset
+from config import PantomimeDatasetConfig
 
 
 class PantomimeDataset(Dataset):
-    def __init__(self, root: str, envs: list[str] = None, angles: list[int] = None, speeds: list[str] = None, actions: list[int] = None):
+    def __init__(self, config: PantomimeDatasetConfig):
+        self.config = config
+        # Transform
         self.transform = Transform()
-        self.transform.resampler = Resampler(config_pantomime_dataset["n_sample_per_chunk"])
-        self.transform.translater = Translater(config_pantomime_dataset["translate_total_dist_std"], config_pantomime_dataset["translate_point_dist_std"])
-        self.transform.scaler = Scaler(config_pantomime_dataset["scale_factor_std"])
-        raw_data = self.read_data(root)
+        self.transform.resampler = Resampler(config.n_sample_per_chunk)
+        self.transform.translater = Translater(config.translate_total_dist_std, config.translate_point_dist_std)
+        self.transform.scaler = Scaler(config.scale_factor_std)
+        # Load data
+        raw_data = self.read_data(config.path)
+        self.idx2label = config.actions
+        self.label2idx = { key: idx for idx, key in enumerate(self.idx2label)}
+        # Read data
         self.label: list[int] = []
         self.data: list[list[np.ndarray]] = []
         for env, angle, speed, action, data in raw_data:
-            if envs is not None and env not in envs:
+            if env not in config.envs:
                 continue
-            if angles is not None and angle not in angles:
+            if angle not in config.angles:
                 continue
-            if speeds is not None and speed not in speeds:
+            if speed not in config.speeds:
                 continue
-            if actions is not None and action not in actions:
+            if action not in config.actions:
                 continue
-            self.label.append(action - 1)
+            self.label.append(self.label2idx[action])
             self.data.append(self.frame_divider(data))
 
     def __len__(self) -> int:
@@ -77,8 +83,8 @@ class PantomimeDataset(Dataset):
         print(f"{average_point_count = }")
 
     def frame_divider(self, data: list[np.ndarray]) -> list[np.ndarray]:
-        n_frame_per_chunk = math.ceil(len(data) / config_pantomime_dataset["n_chunk_per_data"])
+        n_frame_per_chunk = math.ceil(len(data) / self.config.n_chunk_per_data)
         chunks: list[np.ndarray] = []
         for idx in range(0, len(data), n_frame_per_chunk):
-            chunks.append(np.vstack(data[idx:idx+n_frame_per_chunk])[:, :config_pantomime_dataset["n_in_channel"]])
+            chunks.append(np.vstack(data[idx:idx+n_frame_per_chunk])[:, :3])
         return chunks

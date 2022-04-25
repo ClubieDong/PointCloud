@@ -1,5 +1,5 @@
 import numpy as np
-from config import float_t
+from config import np_float_t
 import torch
 
 
@@ -58,6 +58,6 @@ class Transform:
         if self.scaler is not None:
             for idx in range(len(points)):
                 points[idx] = self.scaler.scale(points[idx])
-        points = np.array(points, dtype=float_t)
+        points = np.array(points, dtype=np_float_t)
         points = torch.tensor(points)
         return points

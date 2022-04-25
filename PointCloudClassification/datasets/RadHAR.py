@@ -4,22 +4,39 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from transforms import Transform, Resampler, Translater, Scaler
-from config import float_t, config_radhar_dataset
+from config import np_float_t, RadHARDatasetConfig
 
 
 class RadHARDataset(Dataset):
-    def __init__(self, root: str):
+    def __init__(self, config: RadHARDatasetConfig, train_or_test: str):
+        self.config = config
+        # Transform
         self.transform = Transform()
-        self.transform.resampler = Resampler(config_radhar_dataset["n_sample_per_chunk"])
-        self.transform.translater = Translater(config_radhar_dataset["translate_total_dist_std"], config_radhar_dataset["translate_point_dist_std"])
-        self.transform.scaler = Scaler(config_radhar_dataset["scale_factor_std"])
-        raw_data = self.read_all_data(root)
+        self.transform.resampler = Resampler(config.n_sample_per_chunk)
+        self.transform.translater = Translater(config.translate_total_dist_std, config.translate_point_dist_std)
+        self.transform.scaler = Scaler(config.scale_factor_std)
+        # Load data
+        raw_data = self.read_all_data(os.path.join(config.path, "Train" if train_or_test == "train" else "Test"))
         self.idx2label = raw_data.keys()
         self.label2idx = { key: idx for idx, key in enumerate(self.idx2label)}
+        # Input channels
+        channels = [0, 1, 2]  # x, y, z
+        if config.include_range:
+            channels.append(3)
+        if config.include_velocity:
+            channels.append(4)
+        if config.include_doppler_bin:
+            channels.append(5)
+        if config.include_bearing:
+            channels.append(6)
+        if config.include_intensity:
+            channels.append(7)
+        # Read data
         self.label: list[int] = []
         self.data: list[list[np.ndarray]] = []
         for dir, data_list in raw_data.items():
             for data in data_list:
+                data = [x[:, channels] for x in data]
                 divided_data = self.frame_divider(data)
                 self.label += [self.label2idx[dir]] * len(divided_data)
                 self.data += divided_data
@@ -58,7 +75,7 @@ class RadHARDataset(Dataset):
         for idx, (_, point) in enumerate(points):
             frame.append(point)
             if idx == len(points) - 1 or points[idx + 1][0] == 0:
-                data.append(np.array(frame, dtype=float_t))
+                data.append(np.array(frame, dtype=np_float_t))
                 frame = []
         return data
 
@@ -78,14 +95,12 @@ class RadHARDataset(Dataset):
         return result
 
     def frame_divider(self, data: list[np.ndarray]) -> list[list[np.ndarray]]:
-        n_frame_per_chunk = config_radhar_dataset["n_frame_per_chunk"]
-        n_chunk_per_data = config_radhar_dataset["n_chunk_per_data"]
         chunks: list[np.ndarray] = []
-        for idx in range(0, len(data), n_frame_per_chunk):
-            if idx + n_frame_per_chunk <= len(data):
-                chunks.append(np.vstack(data[idx:idx+n_frame_per_chunk]))
+        for idx in range(0, len(data), self.config.n_frame_per_chunk):
+            if idx + self.config.n_frame_per_chunk <= len(data):
+                chunks.append(np.vstack(data[idx:idx+self.config.n_frame_per_chunk]))
         divided_data: list[list[np.ndarray]] = []
         for idx in range(0, len(chunks)):
-            if idx + n_chunk_per_data <= len(chunks):
-                divided_data.append(chunks[idx:idx+n_chunk_per_data])
+            if idx + self.config.n_chunk_per_data <= len(chunks):
+                divided_data.append(chunks[idx:idx+self.config.n_chunk_per_data])
         return divided_data

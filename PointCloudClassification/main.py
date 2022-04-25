@@ -2,34 +2,37 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 from torch.utils.data import DataLoader, random_split
-from config import config_radhar_dataset, config_pantomime_dataset, device
+from config import *
+from models.pointnet import PointNet
+from models.pointnetpp import PointNetPP
 from models.classifier import Classifier
 from datasets.RadHAR import RadHARDataset
 from datasets.Pantomime import PantomimeDataset
 
 
-def get_dataset(dataset_name: str) -> tuple[DataLoader, DataLoader]:
-    if dataset_name == "RadHAR":
-        train_dataset = DataLoader(RadHARDataset("data/RadHAR/Train"), shuffle=True, batch_size=128, num_workers=0)
-        test_dataset = DataLoader(RadHARDataset("data/RadHAR/Test"), shuffle=True, batch_size=128, num_workers=0)
-    elif dataset_name == "Pantomime":
-        dataset = PantomimeDataset("data/Pantomime", envs=["open", "office"], angles=[0], speeds=["normal"])
+def get_dataset(config) -> tuple[DataLoader, DataLoader]:
+    if isinstance(config, RadHARDatasetConfig):
+        train_dataset = DataLoader(RadHARDataset(config, "train"), shuffle=True, batch_size=config.batch_size, num_workers=config.num_workers)
+        test_dataset = DataLoader(RadHARDataset(config, "test"), shuffle=False, batch_size=config.batch_size, num_workers=config.num_workers)
+    elif isinstance(config, PantomimeDatasetConfig):
+        dataset = PantomimeDataset(config)
         train_dataset, test_dataset = random_split(dataset, (int(len(dataset)*0.8), len(dataset)-int(len(dataset)*0.8)))
-        train_dataset = DataLoader(train_dataset, shuffle=True, batch_size=512, num_workers=0)
-        test_dataset = DataLoader(test_dataset, shuffle=True, batch_size=512, num_workers=0)
+        train_dataset = DataLoader(train_dataset, shuffle=True, batch_size=config.batch_size, num_workers=config.num_workers)
+        test_dataset = DataLoader(test_dataset, shuffle=True, batch_size=config.batch_size, num_workers=config.num_workers)
+    else:
+        raise ValueError("Invalid dataset config")
     return train_dataset, test_dataset
 
 
-def get_model(dataset_name: str) -> nn.Module:
-    if dataset_name == "RadHAR":
-        model = Classifier(n_in_channel=config_radhar_dataset["n_in_channel"],
-                           n_chunk=config_radhar_dataset["n_chunk_per_data"],
-                           n_class=config_radhar_dataset["n_class"]).to(device)
-    elif dataset_name == "Pantomime":
-        model = Classifier(n_in_channel=config_pantomime_dataset["n_in_channel"],
-                           n_chunk=config_pantomime_dataset["n_chunk_per_data"],
-                           n_class=config_pantomime_dataset["n_class"]).to(device)
-    return model
+def get_model(backbone_config, classifier_config: ClassifierConfig) -> nn.Module:
+    if isinstance(backbone_config, PointNetConfig):
+        backbone = PointNet(backbone_config)
+    elif isinstance(backbone_config, PointNetPPConfig):
+        backbone = PointNetPP(backbone_config)
+    else:
+        raise ValueError("Invalid backbone config")
+    classifier = Classifier(backbone, classifier_config)
+    return classifier.to(device)
 
 
 def train(model: nn.Module, train_dataset: DataLoader, criterion: nn.Module, optimizer: torch.optim.Optimizer, epoch_idx: int):
@@ -71,8 +74,12 @@ def test(model: nn.Module, test_dataset: DataLoader, criterion: nn.Module):
 
 
 if __name__ == "__main__":
-    train_dataset, test_dataset = get_dataset("RadHAR")
-    model = get_model("RadHAR")
+    dataset_config = RadHARDatasetConfig()
+    backbone_config = PointNetPPConfig()
+    classifier_config = ClassifierConfig()
+
+    train_dataset, test_dataset = get_dataset(dataset_config)
+    model = get_model(backbone_config, classifier_config)
     optimizer = torch.optim.Adam(model.parameters())
     criterion = nn.CrossEntropyLoss()
 

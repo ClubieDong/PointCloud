@@ -1,22 +1,23 @@
 import torch
 import torch.nn as nn
-from models.pointnet import PointNet
-from models.pointnetpp import PointNetPP
+from config import ClassifierConfig
 from models.mlp import MLP
 
 class Classifier(nn.Module):
-    def __init__(self, n_in_channel: int, n_chunk: int, n_class: int):
+    def __init__(self, backbone: nn.Module, config: ClassifierConfig):
         super().__init__()
-        self.backbone = PointNet(n_in_channel)
-        # self.backbone = PointNetPP(
-        #     n_out_point_list=[50, 20],
-        #     ball_query_n_sample_list=[8, 16],
-        #     ball_query_radius_list=[1000, 1000],
-        #     mlp_layers_list=[[8, 64, 128], [128, 128, 256]],
-        #     final_mlp_layers=[256, 512, 1024],
-        # )
-        self.rnn = nn.LSTM(input_size=1024, hidden_size=256, num_layers=2)
-        self.head = MLP(layers=[n_chunk * 256, 64, n_class])
+        self.backbone = backbone
+        if config.rnn_name == "lstm":
+            self.rnn = nn.LSTM(
+                input_size=config.rnn_config.input_size,
+                hidden_size=config.rnn_config.hidden_size,
+                num_layers=config.rnn_config.num_layers,
+                dropout=config.rnn_config.dropout,
+                bidirectional=config.rnn_config.bidirectional,
+            )
+        else:
+            raise ValueError(f"Unknown rnn_name: {config.rnn_name}")
+        self.head = MLP(config.head_layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x.shape = (n_batch, n_chunk, n_point, n_in_channel)

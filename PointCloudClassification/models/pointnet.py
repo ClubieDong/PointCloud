@@ -1,16 +1,18 @@
 import torch
 import torch.nn as nn
 from models.mlp import MLP, MLPConv1D
-from config import device
+from config import PointNetConfig, device, torch_float_t
 
 
 class TNet(nn.Module):
-    def __init__(self, n_channel: int):
+    def __init__(self, mlp_conv_layers: list[int], mlp_layers: list[int]):
+        assert mlp_conv_layers[0] ** 2 == mlp_layers[-1]
+        assert mlp_conv_layers[-1] == mlp_layers[0]
         super().__init__()
-        self.n_channel = n_channel
-        self.mlp_conv = MLPConv1D(layers=[n_channel, 64, 128, 1024])
-        self.mlp = MLP(layers=[1024, 512, 256, n_channel*n_channel])
-        self.I = torch.eye(n_channel).to(device)
+        self.n_channel = mlp_conv_layers[0]
+        self.mlp_conv = MLPConv1D(mlp_conv_layers)
+        self.mlp = MLP(mlp_layers)
+        self.I = torch.eye(self.n_channel, dtype=torch_float_t).to(device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x.shape = (n_batch, n_point, n_channel)
@@ -28,10 +30,11 @@ class TNet(nn.Module):
 
 
 class PointNetBlock(nn.Module):
-    def __init__(self, layers: list[int]):
+    def __init__(self, mlp_conv_layers: list[int], t_net_mlp_conv_layers: list[int], t_net_mlp_layers: list[int]):
+        assert mlp_conv_layers[0] == t_net_mlp_conv_layers[0]
         super().__init__()
-        self.t_net = TNet(n_channel=layers[0])
-        self.mlp_conv = MLPConv1D(layers)
+        self.t_net = TNet(t_net_mlp_conv_layers, t_net_mlp_layers)
+        self.mlp_conv = MLPConv1D(mlp_conv_layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x.shape = (n_batch, n_point, n_in_channel)
@@ -49,17 +52,18 @@ class PointNetBlock(nn.Module):
 
 
 class PointNet(nn.Module):
-    def __init__(self, n_in_channel: int):
+    def __init__(self, config: PointNetConfig):
         super().__init__()
-        self.block1 = PointNetBlock(layers=[n_in_channel, 64])
-        self.block2 = PointNetBlock(layers=[64, 128, 1024])
+        self.blocks = nn.ModuleList(
+            PointNetBlock(cfg.mlp_conv_layers, cfg.t_net_mlp_conv_layers, cfg.t_net_mlp_layers)
+            for cfg in config.blocks
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x.shape = (n_batch, n_point, n_in_channel)
-        x = self.block1(x)
-        # x.shape = (n_batch, n_point, 64)
-        x = self.block2(x)
-        # x.shape = (n_batch, n_point, 1024)
+        for block in self.blocks:
+            x = block(x)
+        # x.shape = (n_batch, n_point, n_out_channel)
         x, _ = torch.max(x, dim=1)
-        # x.shape = (n_batch, 1024)
+        # x.shape = (n_batch, n_out_channel)
         return x
