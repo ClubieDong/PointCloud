@@ -127,9 +127,10 @@ class ClassifierConfig:
 
 
 @dataclass
-class TrainConfig:
+class Config:
     n_epoch: int = 1
     test_interval: int = 1
+    n_test_resample_time: int = 1
     dataset_config: Union[RadHARDatasetConfig, PantomimeDatasetConfig] = f(RadHARDatasetConfig())
     backbone_config: Union[PointNetConfig, PointNetPPConfig] = f(PointNetPPConfig())
     classifier_config: ClassifierConfig = f(ClassifierConfig())

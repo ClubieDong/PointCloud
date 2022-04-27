@@ -64,20 +64,26 @@ def train_epoch(model: nn.Module, train_dataset: DataLoader, criterion: nn.Modul
     return n_train_correct, train_loss, elapsed_time
 
 
-def test_epoch(model: nn.Module, test_dataset: DataLoader, criterion: nn.Module) -> tuple[float, float, float]:
+def test_epoch(model: nn.Module, test_dataset: DataLoader, criterion: nn.Module, n_resample_time: int, n_class: int) -> tuple[float, float, float]:
     start_time = time.time()
+    zipped_test_dataset = zip(*([test_dataset] * n_resample_time))
     model.eval()
     test_loss, n_test_correct = 0.0, 0
     with torch.no_grad():
-        for x, y in tqdm(test_dataset, desc="Test"):
-            x, y = x.to(device), y.to(device)
-            # x.shape = (n_batch, n_chunk, n_point, n_channel)
-            # y.shape = (n_batch)  y.dtype = torch.int64
-            pred = model(x)
-            # pred.shape = (n_batch, n_class)
-            test_loss += criterion(pred, y).item()
-            n_test_correct += (pred.argmax(dim=1) == y).sum().item()
-    test_loss /= len(test_dataset)
+        for data in tqdm(zipped_test_dataset, desc="Test", total=len(test_dataset)):
+            # Resample multiple times to get more robust results
+            total_pred = torch.zeros(len(data[0][0]), n_class, device=device)
+            # total_pred.shape = (n_batch, n_class)
+            for x, y in data:
+                x, y = x.to(device), y.to(device)
+                # x.shape = (n_batch, n_chunk, n_point, n_channel)
+                # y.shape = (n_batch)  y.dtype = torch.int64
+                pred = model(x)
+                # pred.shape = (n_batch, n_class)
+                test_loss += criterion(pred, y).item()
+                total_pred += pred
+            n_test_correct += (total_pred.argmax(dim=1) == data[0][1].to(device)).sum().item()
+    test_loss /= len(test_dataset) * n_resample_time
     n_test_correct /= len(test_dataset.dataset)
     finish_time = time.time()
     elapsed_time = finish_time - start_time
@@ -86,7 +92,7 @@ def test_epoch(model: nn.Module, test_dataset: DataLoader, criterion: nn.Module)
     return n_test_correct, test_loss, elapsed_time
 
 
-def train(config: TrainConfig):
+def train(config: Config):
     # Save config
     log_dir = os.path.join("logs", datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
     os.makedirs(log_dir, exist_ok=True)
@@ -115,7 +121,7 @@ def train(config: TrainConfig):
         epoch_data["train_loss"] = train_loss
         epoch_data["train_time"] = train_time
         if (epoch_idx + 1) % config.test_interval == 0:
-            test_accuracy, test_loss, test_time = test_epoch(model, test_dataset, criterion)
+            test_accuracy, test_loss, test_time = test_epoch(model, test_dataset, criterion, config.n_test_resample_time, config.classifier_config.head_layers[-1])
             epoch_data["test_accuracy"] = test_accuracy
             epoch_data["test_loss"] = test_loss
             epoch_data["test_time"] = test_time
@@ -140,18 +146,16 @@ def train(config: TrainConfig):
     print("Done!")
 
 
-def eval(model_path: str, config: TrainConfig):
+def evaluate(model_path: str, config: Config):
     # Load dataset and model
     _, test_dataset = get_dataset(config.dataset_config)
     model = get_model(config.backbone_config, config.classifier_config)
     model.load_state_dict(torch.load(model_path))
     criterion = nn.CrossEntropyLoss()
     # Evaluate
-    test_accuracy, test_loss, _ = test_epoch(model, test_dataset, criterion)
-    print("Test accuracy:", test_accuracy)
-    print("Test loss:", test_loss)
+    test_epoch(model, test_dataset, criterion, config.n_test_resample_time, config.classifier_config.head_layers[-1])
 
 
 if __name__ == "__main__":
-    train(TrainConfig())
-    # eval("logs/2022-04-27-17-16-42/best_model.pth", TrainConfig())
+    # train(Config())
+    evaluate("logs/2022-04-27-17-16-42/best_model.pth", Config(n_test_resample_time=10))
