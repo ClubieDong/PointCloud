@@ -1,3 +1,4 @@
+from typing import Union
 import numpy as np
 import torch
 import copy
@@ -12,6 +13,7 @@ device = "cuda"
 
 @dataclass
 class RadHARDatasetConfig:
+    name: str = "RadHAR"
     path: str = "data/RadHAR"
     # DataLoader
     batch_size: int = 128
@@ -34,6 +36,7 @@ class RadHARDatasetConfig:
 
 @dataclass
 class PantomimeDatasetConfig:
+    name: str = "Pantomime"
     path: str = "data/Pantomime"
     # DataLoader
     batch_size: int = 512
@@ -60,6 +63,7 @@ class PointNetConfig:
         t_net_mlp_conv_layers: list[int]
         t_net_mlp_layers: list[int]
     
+    name: str = "PointNet"
     blocks: list[PointNetBlockConfig] = f([
         PointNetBlockConfig(                           # n_in_channel = 8
             mlp_conv_layers=[8, 64],                   # [n_in_channel, 64]
@@ -83,6 +87,7 @@ class PointNetPPConfig:
         ball_query_radius: int
         mlp_layers: list[int]
     
+    name: str = "PointNetPP"
     set_abstractions: list[SetAbstractionConfig] = f([
         SetAbstractionConfig(
             n_out_point=50,
@@ -119,3 +124,12 @@ class ClassifierConfig:
         bidirectional=False,
     ))
     head_layers: list[int] = f([6 * 256, 64, 5])  # [n_chunk * hidden_size, 64, n_class]
+
+
+@dataclass
+class TrainConfig:
+    n_epoch: int = 1
+    test_interval: int = 1
+    dataset_config: Union[RadHARDatasetConfig, PantomimeDatasetConfig] = f(RadHARDatasetConfig())
+    backbone_config: Union[PointNetConfig, PointNetPPConfig] = f(PointNetPPConfig())
+    classifier_config: ClassifierConfig = f(ClassifierConfig())
