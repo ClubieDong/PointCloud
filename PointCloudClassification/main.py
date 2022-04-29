@@ -117,21 +117,24 @@ def train(config: Config):
     # Train
     data: list[dict[str, float]] = []
     best_test_accuracy = 0.0
-    for epoch_idx in range(config.n_epoch):
-        epoch_data = {"epoch_idx": epoch_idx}
-        train_accuracy, train_loss, train_time = train_epoch(model, train_dataset, criterion, optimizer, epoch_idx)
-        epoch_data["train_accuracy"] = train_accuracy
-        epoch_data["train_loss"] = train_loss
-        epoch_data["train_time"] = train_time
-        if (epoch_idx + 1) % config.test_interval == 0:
-            test_accuracy, test_loss, test_time = test_epoch(model, test_dataset, criterion, config.n_test_resample_time, config.classifier_config.head_layers[-1])
-            epoch_data["test_accuracy"] = test_accuracy
-            epoch_data["test_loss"] = test_loss
-            epoch_data["test_time"] = test_time
-            if test_accuracy > best_test_accuracy:
-                best_test_accuracy = test_accuracy
-                torch.save(model.state_dict(), os.path.join(log_dir, "best_model.pth"))
-        data.append(epoch_data)
+    try:
+        for epoch_idx in range(config.n_epoch):
+            epoch_data = {"epoch_idx": epoch_idx}
+            train_accuracy, train_loss, train_time = train_epoch(model, train_dataset, criterion, optimizer, epoch_idx)
+            epoch_data["train_accuracy"] = train_accuracy
+            epoch_data["train_loss"] = train_loss
+            epoch_data["train_time"] = train_time
+            if (epoch_idx + 1) % config.test_interval == 0:
+                test_accuracy, test_loss, test_time = test_epoch(model, test_dataset, criterion, config.n_test_resample_time, config.classifier_config.head_layers[-1])
+                epoch_data["test_accuracy"] = test_accuracy
+                epoch_data["test_loss"] = test_loss
+                epoch_data["test_time"] = test_time
+                if test_accuracy > best_test_accuracy:
+                    best_test_accuracy = test_accuracy
+                    torch.save(model.state_dict(), os.path.join(log_dir, "best_model.pth"))
+            data.append(epoch_data)
+    except KeyboardInterrupt:
+        pass
     # Save model and data
     print("Saving model and data...")
     torch.save(model.state_dict(), os.path.join(log_dir, "model.pth"))
@@ -160,5 +163,5 @@ def evaluate(model_path: str, config: Config):
 
 
 if __name__ == "__main__":
-    train(Config(dataset_config=RadHARDatasetConfig(batch_size=32), backbone_config=PointNetPPMSGConfig()))
-    # evaluate("logs/2022-04-27-17-16-42/best_model.pth", Config(n_test_resample_time=10))
+    train(Config(n_epoch=20, dataset_config=RadHARDatasetConfig(batch_size=16), backbone_config=PointNetPPMSGConfig()))
+    # evaluate("logs/2022-04-29-22-23-20/best_model.pth", Config(n_test_resample_time=10, dataset_config=RadHARDatasetConfig(batch_size=16), backbone_config=PointNetPPMSGConfig()))

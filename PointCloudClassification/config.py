@@ -16,7 +16,7 @@ class RadHARDatasetConfig:
     name: str = "RadHAR"
     path: str = "data/RadHAR"
     # DataLoader
-    batch_size: int = 128
+    batch_size: int = 256
     num_workers: int = 0
     # Input channels
     include_range: bool = True
@@ -92,13 +92,13 @@ class PointNetPPSSGConfig:
         SetAbstractionConfig(
             n_out_point=50,
             ball_query_n_sample=8,
-            ball_query_radius=1000,  # TODO
+            ball_query_radius=0.2,  # TODO
             mlp_layers=[8, 64, 128],
         ),
         SetAbstractionConfig(
             n_out_point=20,
             ball_query_n_sample=16,
-            ball_query_radius=1000,  # TODO
+            ball_query_radius=0.4,  # TODO
             mlp_layers=[128, 128, 256],
         ),
     ])
@@ -119,13 +119,13 @@ class PointNetPPMSGConfig:
         SetAbstractionConfig(
             n_out_point=50,
             ball_query_n_sample=[8, 16, 32],
-            ball_query_radius=[1000, 1000, 1000],  # TODO
+            ball_query_radius=[0.2, 0.4, 0.6],  # TODO
             mlp_layers=[[8, 64, 128], [8, 64, 128], [8, 64, 128]],
         ),
         SetAbstractionConfig(
             n_out_point=20,
             ball_query_n_sample=[16, 24, 32],
-            ball_query_radius=[1000, 1000, 1000],  # TODO
+            ball_query_radius=[0.4, 0.8, 1.2],  # TODO
             mlp_layers=[[3+128*3, 256, 512], [3+128*3, 256, 512], [3+128*3, 256, 512]],
         ),
     ])

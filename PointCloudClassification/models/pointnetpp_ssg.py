@@ -38,6 +38,10 @@ class SetAbstractionSSG(nn.Module):
         # centroid.shape = (n_batch, n_out_point, 3)
         _, group_idx, _ = pytorch3d.ops.ball_query(centroid, pos, K=self.ball_query_n_sample, radius=self.ball_query_radius, return_nn=False)
         # group_idx.shape = (n_batch, n_out_point, ball_query_n_sample)
+        group_padding = group_idx == -1
+        # group_padding.shape = (n_batch, n_out_point, ball_query_n_sample)
+        group_idx[group_padding] = 0
+        # group_idx.shape = (n_batch, n_out_point, ball_query_n_sample)
         group_idx = group_idx[:, :, :, None].expand(-1, -1, -1, x.shape[2])
         # group_idx.shape = (n_batch, n_out_point, ball_query_n_sample, n_channel)
         x = x[:, :, None, :].expand(-1, -1, self.ball_query_n_sample, -1)
@@ -45,6 +49,8 @@ class SetAbstractionSSG(nn.Module):
         x = torch.gather(x, 1, group_idx)
         # x.shape = (n_batch, n_out_point, ball_query_n_sample, n_channel)
         x[:, :, :, :3] -= centroid[:, :, None, :]
+        # x.shape = (n_batch, n_out_point, ball_query_n_sample, n_channel)
+        x[group_padding] = 0.0
         # x.shape = (n_batch, n_out_point, ball_query_n_sample, n_channel)
         return centroid, x
 
