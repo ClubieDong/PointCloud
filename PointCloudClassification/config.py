@@ -79,7 +79,7 @@ class PointNetConfig:
 
 
 @dataclass
-class PointNetPPConfig:
+class PointNetPPSSGConfig:
     @dataclass
     class SetAbstractionConfig:
         n_out_point: int
@@ -87,7 +87,7 @@ class PointNetPPConfig:
         ball_query_radius: int
         mlp_layers: list[int]
     
-    name: str = "PointNetPP"
+    name: str = "PointNetPPSSG"
     set_abstractions: list[SetAbstractionConfig] = f([
         SetAbstractionConfig(
             n_out_point=50,
@@ -103,6 +103,33 @@ class PointNetPPConfig:
         ),
     ])
     final_mlp_layers: list[int] = f([256, 512, 1024])
+
+
+@dataclass
+class PointNetPPMSGConfig:
+    @dataclass
+    class SetAbstractionConfig:
+        n_out_point: int
+        ball_query_n_sample: list[int]
+        ball_query_radius: list[int]
+        mlp_layers: list[list[int]]
+    
+    name: str = "PointNetPPMSG"
+    set_abstractions: list[SetAbstractionConfig] = f([
+        SetAbstractionConfig(
+            n_out_point=50,
+            ball_query_n_sample=[8, 16, 32],
+            ball_query_radius=[1000, 1000, 1000],  # TODO
+            mlp_layers=[[8, 64, 128], [8, 64, 128], [8, 64, 128]],
+        ),
+        SetAbstractionConfig(
+            n_out_point=20,
+            ball_query_n_sample=[16, 24, 32],
+            ball_query_radius=[1000, 1000, 1000],  # TODO
+            mlp_layers=[[3+128*3, 256, 512], [3+128*3, 256, 512], [3+128*3, 256, 512]],
+        ),
+    ])
+    final_mlp_layers: list[int] = f([3+512*3, 512, 1024])
 
 
 @dataclass
@@ -132,5 +159,5 @@ class Config:
     test_interval: int = 1
     n_test_resample_time: int = 1
     dataset_config: Union[RadHARDatasetConfig, PantomimeDatasetConfig] = f(RadHARDatasetConfig())
-    backbone_config: Union[PointNetConfig, PointNetPPConfig] = f(PointNetPPConfig())
+    backbone_config: Union[PointNetConfig, PointNetPPSSGConfig] = f(PointNetPPSSGConfig())
     classifier_config: ClassifierConfig = f(ClassifierConfig())

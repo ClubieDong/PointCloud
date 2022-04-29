@@ -3,6 +3,7 @@ import torch.nn as nn
 from config import ClassifierConfig
 from models.mlp import MLP
 
+
 class Classifier(nn.Module):
     def __init__(self, backbone: nn.Module, config: ClassifierConfig):
         super().__init__()
@@ -29,7 +30,7 @@ class Classifier(nn.Module):
         # x.shape = (n_chunk, n_batch, 256)
         x = x.transpose(0, 1)
         # x.shape = (n_batch, n_chunk, 256)
-        x = x.reshape(x.shape[0], -1)
+        x = x.reshape(x.shape[0], -1)  # TODO: need all hidden layers?
         # x.shape = (n_batch, n_chunk * 256)
         x = self.head(x)
         # x.shape = (n_batch, n_class)

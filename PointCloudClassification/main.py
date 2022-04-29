@@ -9,7 +9,8 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader, random_split
 from config import *
 from models.pointnet import PointNet
-from models.pointnetpp import PointNetPP
+from models.pointnetpp_ssg import PointNetPPSSG
+from models.pointnetpp_msg import PointNetPPMSG
 from models.classifier import Classifier
 from datasets.RadHAR import RadHARDataset
 from datasets.Pantomime import PantomimeDataset
@@ -32,8 +33,10 @@ def get_dataset(config) -> tuple[DataLoader, DataLoader]:
 def get_model(backbone_config, classifier_config: ClassifierConfig) -> nn.Module:
     if isinstance(backbone_config, PointNetConfig):
         backbone = PointNet(backbone_config)
-    elif isinstance(backbone_config, PointNetPPConfig):
-        backbone = PointNetPP(backbone_config)
+    elif isinstance(backbone_config, PointNetPPSSGConfig):
+        backbone = PointNetPPSSG(backbone_config)
+    elif isinstance(backbone_config, PointNetPPMSGConfig):
+        backbone = PointNetPPMSG(backbone_config)
     else:
         raise ValueError("Invalid backbone config")
     classifier = Classifier(backbone, classifier_config)
@@ -157,5 +160,5 @@ def evaluate(model_path: str, config: Config):
 
 
 if __name__ == "__main__":
-    # train(Config())
-    evaluate("logs/2022-04-27-17-16-42/best_model.pth", Config(n_test_resample_time=10))
+    train(Config(dataset_config=RadHARDatasetConfig(batch_size=32), backbone_config=PointNetPPMSGConfig()))
+    # evaluate("logs/2022-04-27-17-16-42/best_model.pth", Config(n_test_resample_time=10))
