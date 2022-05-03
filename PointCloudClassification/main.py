@@ -163,5 +163,5 @@ def evaluate(model_path: str, config: Config):
 
 
 if __name__ == "__main__":
-    train(Config(n_epoch=20, dataset_config=RadHARDatasetConfig(batch_size=16), backbone_config=PointNetPPMSGConfig()))
+    train(Config(n_epoch=20, backbone_config=PointNetPPSSGConfig()))
     # evaluate("logs/2022-04-29-22-23-20/best_model.pth", Config(n_test_resample_time=10, dataset_config=RadHARDatasetConfig(batch_size=16), backbone_config=PointNetPPMSGConfig()))

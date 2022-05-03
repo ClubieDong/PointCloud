@@ -135,22 +135,23 @@ class PointNetPPMSGConfig:
 @dataclass
 class ClassifierConfig:
     @dataclass
-    class LLVMConfig:
+    class RNNConfig:
+        name: str  # lstm, gru, rnn
         input_size: int
         hidden_size: int
         num_layers: int
         dropout: float
         bidirectional: bool
-    
-    rnn_name: str = "lstm"  # lstm, gru, rnn
-    rnn_config: LLVMConfig = f(LLVMConfig(
+
+    rnn_config: RNNConfig = f(RNNConfig(
+        name="rnn",
         input_size=1024,  # n_out_channel
         hidden_size=256,
-        num_layers=2,
+        num_layers=1,
         dropout=0.0,
         bidirectional=False,
     ))
-    head_layers: list[int] = f([6 * 256, 64, 5])  # [n_chunk * hidden_size, 64, n_class]
+    head_layers: list[int] = f([256, 64, 5])  # [hidden_size, 64, n_class]
 
 
 @dataclass
