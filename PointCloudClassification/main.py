@@ -11,6 +11,7 @@ from config import *
 from models.pointnet import PointNet
 from models.pointnetpp_ssg import PointNetPPSSG
 from models.pointnetpp_msg import PointNetPPMSG
+from models.conv3d import Conv3D
 from models.classifier import Classifier
 from datasets.RadHAR import RadHARDataset
 from datasets.Pantomime import PantomimeDataset
@@ -37,6 +38,8 @@ def get_model(backbone_config, classifier_config: ClassifierConfig) -> nn.Module
         backbone = PointNetPPSSG(backbone_config)
     elif isinstance(backbone_config, PointNetPPMSGConfig):
         backbone = PointNetPPMSG(backbone_config)
+    elif isinstance(backbone_config, Conv3DConfig):
+        backbone = Conv3D(backbone_config)
     else:
         raise ValueError("Invalid backbone config")
     classifier = Classifier(backbone, classifier_config)
@@ -163,5 +166,17 @@ def evaluate(model_path: str, config: Config):
 
 
 if __name__ == "__main__":
-    train(Config(n_epoch=20, backbone_config=PointNetPPSSGConfig()))
+    train(Config(
+        n_epoch=20,
+        dataset_config=RadHARDatasetConfig(),
+        backbone_config=Conv3DConfig(),
+        classifier_config=ClassifierConfig(
+            type="conv_3d",
+            rnn_config=ClassifierConfig.RNNConfig(
+                input_size=128,
+                hidden_size=64,
+            ),
+            head_layers=[64, 5],
+        ),
+    ))
     # evaluate("logs/2022-04-29-22-23-20/best_model.pth", Config(n_test_resample_time=10, dataset_config=RadHARDatasetConfig(batch_size=16), backbone_config=PointNetPPMSGConfig()))

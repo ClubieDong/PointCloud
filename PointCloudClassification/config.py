@@ -17,7 +17,7 @@ class RadHARDatasetConfig:
     path: str = "data/RadHAR"
     # DataLoader
     batch_size: int = 256
-    num_workers: int = 0
+    num_workers: int = 12
     # Input channels
     include_range: bool = True
     include_velocity: bool = True
@@ -40,7 +40,7 @@ class PantomimeDatasetConfig:
     path: str = "data/Pantomime"
     # DataLoader
     batch_size: int = 512
-    num_workers: int = 0
+    num_workers: int = 12
     # Labels
     envs: list[str] = f(["office", "open", "industrial", "multi_people", "occluded", "restaurant"])
     angles: list[int] = f([-45, -30, -15, 0, 15, 30, 45])
@@ -133,16 +133,29 @@ class PointNetPPMSGConfig:
 
 
 @dataclass
+class Conv3DConfig:
+    name: str = "Conv3D"
+    n_channels: list[int] = f([6, 8])
+    kernel_size: int = 3
+    max_pooling_size: int = 2
+
+
+@dataclass
 class ClassifierConfig:
     @dataclass
     class RNNConfig:
-        name: str  # lstm, gru, rnn
-        input_size: int
-        hidden_size: int
-        num_layers: int
-        dropout: float
-        bidirectional: bool
+        name: str = "rnn"  # lstm, gru, rnn
+        input_size: int = 1024
+        hidden_size: int = 256
+        num_layers: int = 1
+        dropout: float = 0.0
+        bidirectional: bool = False
 
+    type: str = "point_cloud"  # point_cloud, conv_3d
+    # Voxelization
+    dim_size: tuple[int, int, int] = f((5, 10, 10))
+    center: tuple[float, float, float] = f((4.0, 0.0, 0.0))
+    # Models
     rnn_config: RNNConfig = f(RNNConfig(
         name="rnn",
         input_size=1024,  # n_out_channel

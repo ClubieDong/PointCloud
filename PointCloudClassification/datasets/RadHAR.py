@@ -44,7 +44,7 @@ class RadHARDataset(Dataset):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, idx) -> tuple[torch.Tensor, int]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         return self.transform.transform(self.data[idx]), self.label[idx]
 
     def read_file(self, path: str) -> list[np.ndarray]:

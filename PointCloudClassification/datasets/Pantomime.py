@@ -38,7 +38,7 @@ class PantomimeDataset(Dataset):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, idx) -> tuple[torch.Tensor, int]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         return self.transform.transform(self.data[idx]), self.label[idx]
 
     # Return list of [environment, angle, speed, action, data]
