@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from transforms import Transform, Resampler, Translater, Scaler
-from config import PantomimeDatasetConfig
+from config import PantomimeDatasetConfig, np_float_t
 
 
 class PantomimeDataset(Dataset):
@@ -56,7 +56,8 @@ class PantomimeDataset(Dataset):
                             for action in list_dir(os.path.join(root, exp, env, "1", angle, speed, id)):
                                 for file in list_dir(os.path.join(root, exp, env, "1", angle, speed, id, action)):
                                     with open(os.path.join(root, exp, env, "1", angle, speed, id, action, file), "rb") as f:
-                                        data = pickle.load(f, encoding="latin1")
+                                        data: list[np.ndarray] = pickle.load(f, encoding="latin1")
+                                    data = [x.astype(np_float_t) for x in data]
                                     result.append((env, int(angle), speed, int(action), data))
         with open(os.path.join(root, "data.pickle"), "wb") as f:
             pickle.dump(result, f)

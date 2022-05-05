@@ -141,6 +141,12 @@ class Conv3DConfig:
 
 
 @dataclass
+class PCABackboneConfig:
+    name: str = "PCABackbone"
+    layers: list[int] = f([100, 128])
+
+
+@dataclass
 class ClassifierConfig:
     @dataclass
     class RNNConfig:
@@ -151,10 +157,13 @@ class ClassifierConfig:
         dropout: float = 0.0
         bidirectional: bool = False
 
-    type: str = "point_cloud"  # point_cloud, conv_3d
+    type: str = "point_cloud"  # point_cloud, conv_3d, pca
     # Voxelization
     dim_size: tuple[int, int, int] = f((5, 10, 10))
     center: tuple[float, float, float] = f((4.0, 0.0, 0.0))
+    voxel_size: float = 1.0
+    # PCA
+    n_components: int = 100
     # Models
     rnn_config: RNNConfig = f(RNNConfig(
         name="rnn",

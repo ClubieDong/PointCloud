@@ -3,6 +3,8 @@ import json
 import time
 import dataclasses
 from datetime import datetime
+from models.mlp import MLP
+import utils
 import torch
 import torch.nn as nn
 from tqdm import tqdm
@@ -17,21 +19,23 @@ from datasets.RadHAR import RadHARDataset
 from datasets.Pantomime import PantomimeDataset
 
 
-def get_dataset(config) -> tuple[DataLoader, DataLoader]:
+def get_dataset(config) -> tuple[DataLoader, DataLoader, list[list[np.ndarray]]]:
     if isinstance(config, RadHARDatasetConfig):
         train_dataset = DataLoader(RadHARDataset(config, "train"), shuffle=True, batch_size=config.batch_size, num_workers=config.num_workers)
         test_dataset = DataLoader(RadHARDataset(config, "test"), shuffle=False, batch_size=config.batch_size, num_workers=config.num_workers)
+        raw_data = train_dataset.dataset.data
     elif isinstance(config, PantomimeDatasetConfig):
         dataset = PantomimeDataset(config)
         train_dataset, test_dataset = random_split(dataset, (int(len(dataset)*0.8), len(dataset)-int(len(dataset)*0.8)), generator=torch.Generator().manual_seed(42))
         train_dataset = DataLoader(train_dataset, shuffle=True, batch_size=config.batch_size, num_workers=config.num_workers)
         test_dataset = DataLoader(test_dataset, shuffle=False, batch_size=config.batch_size, num_workers=config.num_workers)
+        raw_data = dataset.data
     else:
         raise ValueError("Invalid dataset config")
-    return train_dataset, test_dataset
+    return train_dataset, test_dataset, raw_data
 
 
-def get_model(backbone_config, classifier_config: ClassifierConfig) -> nn.Module:
+def get_model(backbone_config, classifier_config: ClassifierConfig) -> Classifier:
     if isinstance(backbone_config, PointNetConfig):
         backbone = PointNet(backbone_config)
     elif isinstance(backbone_config, PointNetPPSSGConfig):
@@ -40,6 +44,8 @@ def get_model(backbone_config, classifier_config: ClassifierConfig) -> nn.Module
         backbone = PointNetPPMSG(backbone_config)
     elif isinstance(backbone_config, Conv3DConfig):
         backbone = Conv3D(backbone_config)
+    elif isinstance(backbone_config, PCABackboneConfig):
+        backbone = MLP(backbone_config.layers)
     else:
         raise ValueError("Invalid backbone config")
     classifier = Classifier(backbone, classifier_config)
@@ -107,8 +113,16 @@ def train(config: Config):
     with open(os.path.join(log_dir, "config.json"), "w") as f:
         json.dump(config_dict, f, indent=4)
     # Load dataset and model
-    train_dataset, test_dataset = get_dataset(config.dataset_config)
+    train_dataset, test_dataset, raw_data = get_dataset(config.dataset_config)
     model = get_model(config.backbone_config, config.classifier_config)
+    if config.classifier_config.type == "pca":
+        model.pca = utils.calc_pca(
+            raw_data=raw_data, 
+            n_components=config.classifier_config.n_components,
+            dim_size=config.classifier_config.dim_size,
+            center=config.classifier_config.center,
+            voxel_size=config.classifier_config.voxel_size
+        )
     optimizer = torch.optim.Adam(model.parameters())
     criterion = nn.CrossEntropyLoss()
     # Show statistics
@@ -157,9 +171,17 @@ def train(config: Config):
 
 def evaluate(model_path: str, config: Config):
     # Load dataset and model
-    _, test_dataset = get_dataset(config.dataset_config)
+    _, test_dataset, raw_data = get_dataset(config.dataset_config)
     model = get_model(config.backbone_config, config.classifier_config)
     model.load_state_dict(torch.load(model_path))
+    if config.classifier_config.type == "pca":
+        model.pca = utils.calc_pca(
+            raw_data=raw_data, 
+            n_components=config.classifier_config.n_components,
+            dim_size=config.classifier_config.dim_size,
+            center=config.classifier_config.center,
+            voxel_size=config.classifier_config.voxel_size
+        )
     criterion = nn.CrossEntropyLoss()
     # Evaluate
     test_epoch(model, test_dataset, criterion, config.n_test_resample_time, config.classifier_config.head_layers[-1])
@@ -169,9 +191,9 @@ if __name__ == "__main__":
     train(Config(
         n_epoch=20,
         dataset_config=RadHARDatasetConfig(),
-        backbone_config=Conv3DConfig(),
+        backbone_config=PCABackboneConfig(),
         classifier_config=ClassifierConfig(
-            type="conv_3d",
+            type="pca",
             rnn_config=ClassifierConfig.RNNConfig(
                 input_size=128,
                 hidden_size=64,
