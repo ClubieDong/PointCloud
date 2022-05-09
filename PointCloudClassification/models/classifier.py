@@ -43,7 +43,6 @@ class Classifier(nn.Module):
                 voxel_size=self.config.voxel_size
             )) for chunk in x])
         elif self.config.type == "pca":
-            # TODO
             chunk_list = []
             for chunk in x:
                 # chunk.shape = (n_batch, n_point, n_in_channel)

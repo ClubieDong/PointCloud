@@ -30,7 +30,7 @@ def calc_pca(raw_data: list[list[np.ndarray]], n_components: int, dim_size: tupl
     batch_size = 4096
     xyz = [torch.from_numpy(y[:, :3]).to(device) for x in raw_data for y in x]
     features = [torch.from_numpy(y[:, 3:]).to(device) for x in raw_data for y in x]
-    results: list[torch.Tensor] = []
+    results: list[np.ndarray] = []
     for idx in tqdm(range(0, len(xyz), batch_size)):
         point_cloud = Pointclouds(
             points=xyz[idx:idx+batch_size],
@@ -43,9 +43,8 @@ def calc_pca(raw_data: list[list[np.ndarray]], n_components: int, dim_size: tupl
             voxel_size = voxel_size,
         )
         volume = pytorch3d.ops.add_pointclouds_to_volumes(point_cloud, volume)
-        results.append(torch.hstack((volume.densities(), volume.features())))
-    results = torch.vstack(results)
-    results = results.cpu().numpy()
+        results.append(torch.hstack((volume.densities(), volume.features())).cpu().numpy())
+    results = np.vstack(results)
     results = results.reshape(results.shape[0], -1)
     pca = PCA(n_components)
     pca.fit(results)

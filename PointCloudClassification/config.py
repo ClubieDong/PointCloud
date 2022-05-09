@@ -11,13 +11,17 @@ np_float_t = np.float32
 torch_float_t = torch.float32
 device = "cuda"
 
+
+# min(x)= 0.00, max(x)=8.62
+# min(y)=-5.20, max(y)=3.54
+# min(z)=-8.18, max(z)=7.87
 @dataclass
 class RadHARDatasetConfig:
     name: str = "RadHAR"
     path: str = "data/RadHAR"
     # DataLoader
     batch_size: int = 256
-    num_workers: int = 12
+    num_workers: int = 20
     # Input channels
     include_range: bool = True
     include_velocity: bool = True
@@ -34,13 +38,16 @@ class RadHARDatasetConfig:
     scale_factor_std: float = 0.1           # X *= N(1, 0.1)
 
 
+# min(x)= 0.00, max(x)=1.64
+# min(y)=-1.59, max(y)=1.59
+# min(z)=-1.63, max(z)=1.63
 @dataclass
 class PantomimeDatasetConfig:
     name: str = "Pantomime"
     path: str = "data/Pantomime"
     # DataLoader
-    batch_size: int = 512
-    num_workers: int = 12
+    batch_size: int = 1024
+    num_workers: int = 20
     # Labels
     envs: list[str] = f(["office", "open", "industrial", "multi_people", "occluded", "restaurant"])
     angles: list[int] = f([-45, -30, -15, 0, 15, 30, 45])
@@ -92,13 +99,13 @@ class PointNetPPSSGConfig:
         SetAbstractionConfig(
             n_out_point=50,
             ball_query_n_sample=8,
-            ball_query_radius=0.2,  # TODO
+            ball_query_radius=0.2,
             mlp_layers=[8, 64, 128],
         ),
         SetAbstractionConfig(
             n_out_point=20,
             ball_query_n_sample=16,
-            ball_query_radius=0.4,  # TODO
+            ball_query_radius=0.4,
             mlp_layers=[128, 128, 256],
         ),
     ])
@@ -119,13 +126,13 @@ class PointNetPPMSGConfig:
         SetAbstractionConfig(
             n_out_point=50,
             ball_query_n_sample=[8, 16, 32],
-            ball_query_radius=[0.2, 0.4, 0.6],  # TODO
+            ball_query_radius=[0.2, 0.4, 0.6],
             mlp_layers=[[8, 64, 128], [8, 64, 128], [8, 64, 128]],
         ),
         SetAbstractionConfig(
             n_out_point=20,
             ball_query_n_sample=[16, 24, 32],
-            ball_query_radius=[0.4, 0.8, 1.2],  # TODO
+            ball_query_radius=[0.4, 0.8, 1.2],
             mlp_layers=[[3+128*3, 256, 512], [3+128*3, 256, 512], [3+128*3, 256, 512]],
         ),
     ])
