@@ -189,16 +189,131 @@ def evaluate(model_path: str, config: Config):
 
 if __name__ == "__main__":
     train(Config(
-        n_epoch=20,
-        dataset_config=RadHARDatasetConfig(),
-        backbone_config=PCABackboneConfig(),
-        classifier_config=ClassifierConfig(
-            type="pca",
-            rnn_config=ClassifierConfig.RNNConfig(
-                input_size=128,
-                hidden_size=64,
-            ),
-            head_layers=[64, 5],
+        n_epoch=10,
+        dataset_config=RadHARDatasetConfig(
+            include_range=True,
+            include_velocity=True,
+            include_doppler_bin=True,
+            include_bearing=True,
+            include_intensity=True,
+            translate_total_dist_std=0.1,
+            translate_point_dist_std=0.01,
+            scale_factor_std=0.1,
         ),
+
+        # ========== Conv3D ==========
+        # backbone_config=Conv3DConfig(
+        #     n_channels=[6, 16],
+        #     kernel_size=3,
+        # ),
+        # classifier_config=ClassifierConfig(
+        #     type="conv_3d",
+        #     dim_size=(5, 10, 10),
+        #     center=(4.0, 0.0, 0.0),
+        #     voxel_size=1.0,
+        #     n_components=100,
+        #     rnn_config=ClassifierConfig.RNNConfig(
+        #         name="lstm",
+        #         input_size=256,
+        #         hidden_size=128,
+        #     ),
+        #     head_layers=[128, 32, 5],
+        # ),
+
+        # ========== PCA ==========
+        # backbone_config=PCABackboneConfig(
+        #     layers=[200, 256]
+        # ),
+        # classifier_config=ClassifierConfig(
+        #     type="pca",
+        #     dim_size=(5, 10, 10),
+        #     center=(4.0, 0.0, 0.0),
+        #     voxel_size=1.0,
+        #     n_components=200,
+        #     rnn_config=ClassifierConfig.RNNConfig(
+        #         name="rnn",
+        #         input_size=256,
+        #         hidden_size=128,
+        #     ),
+        #     head_layers=[128, 32, 5],
+        # ),
+
+        # ========== PointNet ==========
+        # backbone_config=PointNetConfig(
+        #     blocks=[
+        #         PointNetConfig.PointNetBlockConfig(            # n_in_channel = 8
+        #             mlp_conv_layers=[8, 64],                   # [n_in_channel, 64]
+        #             t_net_mlp_conv_layers=[8, 64, 128, 1024],  # [n_in_channel, 64, 128, 1024]
+        #             t_net_mlp_layers=[1024, 512, 256, 8*8],    # [1024, 512, 256, n_in_channel*n_in_channel]
+        #         ),
+        #         PointNetConfig.PointNetBlockConfig(             # n_in_channel = 64
+        #             mlp_conv_layers=[64, 128, 1024],            # [n_in_channel, 128, 1024]
+        #             t_net_mlp_conv_layers=[64, 64, 128, 1024],  # [n_in_channel, 64, 128, 1024]
+        #             t_net_mlp_layers=[1024, 512, 256, 64*64],   # [1024, 512, 256, n_in_channel*n_in_channel]
+        #         ),
+        #     ]
+        # ),
+        # classifier_config=ClassifierConfig(
+        #     rnn_config=ClassifierConfig.RNNConfig(
+        #         name="lstm",
+        #         input_size=1024,
+        #         hidden_size=256,
+        #     ),
+        #     head_layers=[256, 64, 5],
+        # ),
+
+        # ========== PointNet++ SSG ==========
+        # backbone_config=PointNetPPSSGConfig(
+        #     set_abstractions=[
+        #         PointNetPPSSGConfig.SetAbstractionConfig(
+        #             n_out_point=50,
+        #             ball_query_n_sample=8,
+        #             ball_query_radius=0.2,
+        #             mlp_layers=[8, 64, 128],
+        #         ),
+        #         PointNetPPSSGConfig.SetAbstractionConfig(
+        #             n_out_point=20,
+        #             ball_query_n_sample=16,
+        #             ball_query_radius=0.4,
+        #             mlp_layers=[128, 128, 256],
+        #         ),
+        #     ],
+        #     final_mlp_layers=[256, 512, 1024]
+        # ),
+        # classifier_config=ClassifierConfig(
+        #     rnn_config=ClassifierConfig.RNNConfig(
+        #         name="rnn",
+        #         input_size=1024,
+        #         hidden_size=256,
+        #     ),
+        #     head_layers=[256, 64, 5],
+        # ),
+
+        # ========== PointNet++ MSG ==========
+        # backbone_config=PointNetPPMSGConfig(
+        #     set_abstractions=[
+        #         PointNetPPMSGConfig.SetAbstractionConfig(
+        #             n_out_point=50,
+        #             ball_query_n_sample=[8, 16, 32],
+        #             ball_query_radius=[0.2, 0.4, 0.6],
+        #             mlp_layers=[[8, 16, 32], [8, 16, 32], [8, 16, 32]],
+        #         ),
+        #         PointNetPPMSGConfig.SetAbstractionConfig(
+        #             n_out_point=20,
+        #             ball_query_n_sample=[16, 24, 32],
+        #             ball_query_radius=[0.4, 0.8, 1.2],
+        #             mlp_layers=[[3+32*3, 128, 256], [3+32*3, 128, 256], [3+32*3, 128, 256]],
+        #         ),
+        #     ],
+        #     final_mlp_layers=[3+256*3, 1024]
+        # ),
+        # classifier_config=ClassifierConfig(
+        #     rnn_config=ClassifierConfig.RNNConfig(
+        #         name="lstm",
+        #         input_size=1024,
+        #         hidden_size=256,
+        #     ),
+        #     head_layers=[256, 64, 5],
+        # ),
     ))
     # evaluate("logs/2022-04-29-22-23-20/best_model.pth", Config(n_test_resample_time=10, dataset_config=RadHARDatasetConfig(batch_size=16), backbone_config=PointNetPPMSGConfig()))
