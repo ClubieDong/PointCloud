@@ -4,6 +4,7 @@ import time
 import dataclasses
 from datetime import datetime
 from models.mlp import MLP
+import matplotlib.pyplot as plt
 import utils
 import torch
 import torch.nn as nn
@@ -78,6 +79,7 @@ def train_epoch(model: nn.Module, train_dataset: DataLoader, criterion: nn.Modul
 
 def test_epoch(model: nn.Module, test_dataset: DataLoader, criterion: nn.Module, n_resample_time: int, n_class: int) -> tuple[float, float, float]:
     start_time = time.time()
+    conf_mat = np.zeros((n_class, n_class), dtype=np.int64)
     zipped_test_dataset = zip(*([test_dataset] * n_resample_time))
     model.eval()
     test_loss, n_test_correct = 0.0, 0
@@ -94,6 +96,9 @@ def test_epoch(model: nn.Module, test_dataset: DataLoader, criterion: nn.Module,
                 # pred.shape = (n_batch, n_class)
                 test_loss += criterion(pred, y).item()
                 total_pred += pred
+                pred_cls = total_pred.argmax(dim=1)
+                for a, b in zip(y, pred_cls):
+                    conf_mat[a, b] += 1
             n_test_correct += (total_pred.argmax(dim=1) == data[0][1].to(device)).sum().item()
     test_loss /= len(test_dataset) * n_resample_time
     n_test_correct /= len(test_dataset.dataset)
@@ -101,7 +106,7 @@ def test_epoch(model: nn.Module, test_dataset: DataLoader, criterion: nn.Module,
     elapsed_time = finish_time - start_time
     print(f"Test accuracy: {(100*n_test_correct):>0.2f}%, Average loss: {test_loss:>0.6f}, Elapsed time: {(elapsed_time):>0.2f}s")
     print()
-    return n_test_correct, test_loss, elapsed_time
+    return n_test_correct, test_loss, elapsed_time, conf_mat
 
 
 def train(config: Config):
@@ -142,7 +147,7 @@ def train(config: Config):
             epoch_data["train_loss"] = train_loss
             epoch_data["train_time"] = train_time
             if (epoch_idx + 1) % config.test_interval == 0:
-                test_accuracy, test_loss, test_time = test_epoch(model, test_dataset, criterion, config.n_test_resample_time, config.classifier_config.head_layers[-1])
+                test_accuracy, test_loss, test_time, _ = test_epoch(model, test_dataset, criterion, config.n_test_resample_time, config.classifier_config.head_layers[-1])
                 epoch_data["test_accuracy"] = test_accuracy
                 epoch_data["test_loss"] = test_loss
                 epoch_data["test_time"] = test_time
@@ -169,11 +174,17 @@ def train(config: Config):
     print("Done!")
 
 
-def evaluate(model_path: str, config: Config):
+def evaluate(log_dir: str, times: int):
+    with open(os.path.join(log_dir, "config.json"), "r") as f:
+        config: Config = eval(json.load(f)["python_expr"])
+    config.n_test_resample_time = times
     # Load dataset and model
     _, test_dataset, raw_data = get_dataset(config.dataset_config)
     model = get_model(config.backbone_config, config.classifier_config)
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(os.path.join(log_dir, "best_model.pth")))
+    criterion = nn.CrossEntropyLoss()
+    print(f"Log dir: {log_dir}, model size: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
+    # Calc PCA if needed
     if config.classifier_config.type == "pca":
         model.pca = utils.calc_pca(
             raw_data=raw_data, 
@@ -182,122 +193,34 @@ def evaluate(model_path: str, config: Config):
             center=config.classifier_config.center,
             voxel_size=config.classifier_config.voxel_size
         )
-    criterion = nn.CrossEntropyLoss()
+    # Test inference time
+    model.eval()
+    with torch.no_grad():
+        x, _ = test_dataset.dataset[0]
+        x = x[None, ...].to(device)
+        model(x)  # Dry run, load data into cache
+        start_time = time.time()
+        model(x)
+        finish_time = time.time()
+        inference_time = (finish_time - start_time) * 1000
+        print(f"Inference time: {inference_time:.2f}ms")
     # Evaluate
-    test_epoch(model, test_dataset, criterion, config.n_test_resample_time, config.classifier_config.head_layers[-1])
+    _, _, _, conf_mat = test_epoch(model, test_dataset, criterion, config.n_test_resample_time, config.classifier_config.head_layers[-1])
+    # Save confusion matrix
+    plt.figure(figsize=(10, 10))
+    plt.matshow(conf_mat, cmap="Blues")
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    plt.savefig(os.path.join(log_dir, "conf_mat.png"))
+    plt.close()
+
+
+def evaluate_multi(root: str, times: int):
+    dirs = os.listdir(root)
+    dirs.sort()
+    for dir in dirs:
+        evaluate(os.path.join(root, dir), times)
 
 
 if __name__ == "__main__":
-    point_net_cfg = Config(
-        n_epoch=40,
-        dataset_config=PantomimeDatasetConfig(
-            envs=["office", "open", "industrial", "restaurant"],
-            angles=[0],
-            speeds=["normal"],
-            actions=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
-            translate_total_dist_std=0.1,
-            translate_point_dist_std=0.01,
-            scale_factor_std=0.1,
-        ),
-        backbone_config=PointNetConfig(
-            blocks=[
-                PointNetConfig.PointNetBlockConfig(            # n_in_channel = 8
-                    mlp_conv_layers=[3, 64],                   # [n_in_channel, 64]
-                    t_net_mlp_conv_layers=[3, 64, 128, 1024],  # [n_in_channel, 64, 128, 1024]
-                    t_net_mlp_layers=[1024, 512, 256, 3*3],    # [1024, 512, 256, n_in_channel*n_in_channel]
-                ),
-                PointNetConfig.PointNetBlockConfig(             # n_in_channel = 64
-                    mlp_conv_layers=[64, 128, 1024],            # [n_in_channel, 128, 1024]
-                    t_net_mlp_conv_layers=[64, 64, 128, 1024],  # [n_in_channel, 64, 128, 1024]
-                    t_net_mlp_layers=[1024, 512, 256, 64*64],   # [1024, 512, 256, n_in_channel*n_in_channel]
-                ),
-            ]
-        ),
-        classifier_config=ClassifierConfig(
-            rnn_config=ClassifierConfig.RNNConfig(
-                name="lstm",
-                input_size=1024,
-                hidden_size=256,
-            ),
-            head_layers=[256, 64, 21],
-        ),
-    )
-    point_net_pp_ssg_cfg = Config(
-        n_epoch=40,
-        dataset_config=PantomimeDatasetConfig(
-            envs=["office", "open", "industrial", "restaurant"],
-            angles=[0],
-            speeds=["normal"],
-            actions=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
-            translate_total_dist_std=0.1,
-            translate_point_dist_std=0.01,
-            scale_factor_std=0.1,
-        ),
-        backbone_config=PointNetPPSSGConfig(
-            set_abstractions=[
-                PointNetPPSSGConfig.SetAbstractionConfig(
-                    n_out_point=50,
-                    ball_query_n_sample=8,
-                    ball_query_radius=0.2,
-                    mlp_layers=[3, 64, 128],
-                ),
-                PointNetPPSSGConfig.SetAbstractionConfig(
-                    n_out_point=20,
-                    ball_query_n_sample=16,
-                    ball_query_radius=0.4,
-                    mlp_layers=[128, 128, 256],
-                ),
-            ],
-            final_mlp_layers=[256, 512, 1024]
-        ),
-        classifier_config=ClassifierConfig(
-            rnn_config=ClassifierConfig.RNNConfig(
-                name="rnn",
-                input_size=1024,
-                hidden_size=256,
-            ),
-            head_layers=[256, 64, 21],
-        ),
-    )
-    point_net_pp_msg_cfg = Config(
-        n_epoch=40,
-        dataset_config=PantomimeDatasetConfig(
-            envs=["office", "open", "industrial", "restaurant"],
-            angles=[0],
-            speeds=["normal"],
-            actions=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
-            translate_total_dist_std=0.1,
-            translate_point_dist_std=0.01,
-            scale_factor_std=0.1,
-        ),
-        backbone_config=PointNetPPMSGConfig(
-            set_abstractions=[
-                PointNetPPMSGConfig.SetAbstractionConfig(
-                    n_out_point=50,
-                    ball_query_n_sample=[8, 16, 32],
-                    ball_query_radius=[0.2, 0.4, 0.6],
-                    mlp_layers=[[3, 16, 32], [3, 16, 32], [3, 16, 32]],
-                ),
-                PointNetPPMSGConfig.SetAbstractionConfig(
-                    n_out_point=20,
-                    ball_query_n_sample=[16, 24, 32],
-                    ball_query_radius=[0.4, 0.8, 1.2],
-                    mlp_layers=[[3+32*3, 128, 256], [3+32*3, 128, 256], [3+32*3, 128, 256]],
-                ),
-            ],
-            final_mlp_layers=[3+256*3, 1024]
-        ),
-        classifier_config=ClassifierConfig(
-            rnn_config=ClassifierConfig.RNNConfig(
-                name="lstm",
-                input_size=1024,
-                hidden_size=256,
-            ),
-            head_layers=[256, 64, 21],
-        ),
-    )
-    
-    for cfg in [point_net_cfg, point_net_pp_ssg_cfg, point_net_pp_msg_cfg]:
-        for rnn_name in ["rnn", "gru", "lstm"]:
-            cfg.classifier_config.rnn_config.name = rnn_name
-            train(cfg)
+    evaluate_multi("logs/1", 1)
