@@ -223,4 +223,62 @@ def evaluate_multi(root: str, times: int):
 
 
 if __name__ == "__main__":
-    evaluate_multi("logs/1", 1)
+    n_channel = 3
+    config = Config(
+        n_epoch=20,
+        dataset_config=RadHARDatasetConfig(
+            batch_size=512,
+            include_range=False,
+            include_velocity=False,
+            include_doppler_bin=False,
+            include_bearing=False,
+            include_intensity=False,
+            translate_total_dist_std=0.1,
+            translate_point_dist_std=0.01,
+            scale_factor_std=0.1,
+        ),
+        backbone_config=PointNetPPSSGConfig(
+            set_abstractions=[
+                PointNetPPSSGConfig.SetAbstractionConfig(
+                    n_out_point=50,
+                    ball_query_n_sample=8,
+                    ball_query_radius=0.2,
+                    mlp_layers=[n_channel, 64, 128],
+                ),
+                PointNetPPSSGConfig.SetAbstractionConfig(
+                    n_out_point=20,
+                    ball_query_n_sample=16,
+                    ball_query_radius=0.4,
+                    mlp_layers=[128, 128, 256],
+                ),
+            ],
+            final_mlp_layers=[256, 512, 1024]
+        ),
+        classifier_config=ClassifierConfig(
+            rnn_config=ClassifierConfig.RNNConfig(
+                name="rnn",
+                input_size=1024,
+                hidden_size=256,
+            ),
+            head_layers=[256, 64, 5],
+        ),
+    )
+    chs = [
+        [0,0,0,0,0],
+        [1,0,0,0,0],
+        [0,1,0,0,0],
+        [0,0,1,0,0],
+        [0,0,0,1,0],
+        [0,0,0,0,1],
+        [1,1,0,0,0],
+        [1,1,1,1,1],
+    ]
+    for ch in chs:
+        print(ch)
+        config.dataset_config.include_range = bool(ch[0])
+        config.dataset_config.include_velocity = bool(ch[1])
+        config.dataset_config.include_doppler_bin = bool(ch[2])
+        config.dataset_config.include_bearing = bool(ch[3])
+        config.dataset_config.include_intensity = bool(ch[4])
+        config.backbone_config.set_abstractions[0].mlp_layers[0] = sum(ch) + 3
+        train(config)
