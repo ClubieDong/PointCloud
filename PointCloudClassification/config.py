@@ -46,7 +46,7 @@ class PantomimeDatasetConfig:
     name: str = "Pantomime"
     path: str = "data/Pantomime"
     # DataLoader
-    batch_size: int = 1024
+    batch_size: int = 256
     num_workers: int = 20
     # Labels
     envs: list[str] = f(["office", "open", "industrial", "multi_people", "occluded", "restaurant"])
