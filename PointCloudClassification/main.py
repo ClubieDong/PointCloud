@@ -174,10 +174,11 @@ def train(config: Config):
     print("Done!")
 
 
-def evaluate(log_dir: str, times: int):
+def evaluate(log_dir: str, times: int, speed: list[int]):
     with open(os.path.join(log_dir, "config.json"), "r") as f:
         config: Config = eval(json.load(f)["python_expr"])
     config.n_test_resample_time = times
+    config.dataset_config.speeds = speed
     # Load dataset and model
     _, test_dataset, raw_data = get_dataset(config.dataset_config)
     model = get_model(config.backbone_config, config.classifier_config)
@@ -216,62 +217,64 @@ def evaluate(log_dir: str, times: int):
 
 
 def evaluate_multi(root: str, times: int):
+    speeds = [
+        ["slow", "normal", "fast"],
+        ["slow"],
+        ["normal"],
+        ["fast"],
+    ]
     dirs = os.listdir(root)
     dirs.sort()
     for dir in dirs:
-        evaluate(os.path.join(root, dir), times)
+        for s in speeds:
+            print(f"Train on {dir}, test on {s}")
+            evaluate(os.path.join(root, dir), times, speed=s)
 
 
 if __name__ == "__main__":
-    config = Config(
-        n_epoch=10,
-        dataset_config=PantomimeDatasetConfig(
-            envs=["office", "open", "industrial", "restaurant"],
-            angles=[0],
-            speeds=["normal"],
-            actions=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
-            translate_total_dist_std=0.2,
-            translate_point_dist_std=0.02,
-            scale_factor_std=0.2,
-        ),
-        backbone_config=PointNetPPMSGConfig(
-            set_abstractions=[
-                PointNetPPMSGConfig.SetAbstractionConfig(
-                    n_out_point=50,
-                    ball_query_n_sample=[8, 16, 32],
-                    ball_query_radius=[0.2, 0.4, 0.6],
-                    mlp_layers=[[3, 16, 32], [3, 16, 32], [3, 16, 32]],
-                ),
-                PointNetPPMSGConfig.SetAbstractionConfig(
-                    n_out_point=20,
-                    ball_query_n_sample=[16, 24, 32],
-                    ball_query_radius=[0.4, 0.8, 1.2],
-                    mlp_layers=[[3+32*3, 128, 256], [3+32*3, 128, 256], [3+32*3, 128, 256]],
-                ),
-            ],
-            final_mlp_layers=[3+256*3, 1024]
-        ),
-        classifier_config=ClassifierConfig(
-            rnn_config=ClassifierConfig.RNNConfig(
-                name="gru",
-                input_size=1024,
-                hidden_size=256,
-            ),
-            head_layers=[256, 64, 21],
-        ),
-    )
-    a = [
-        (0.0, 0.00, 0.0),
-        (0.1, 0.00, 0.0),
-        (0.2, 0.00, 0.0),
-        (0.0, 0.01, 0.0),
-        (0.0, 0.02, 0.0),
-        (0.0, 0.00, 0.1),
-        (0.0, 0.00, 0.2),
-    ]
-    for x, y, z in a:
-        print(x, y, z)
-        config.dataset_config.translate_total_dist_std = x
-        config.dataset_config.translate_point_dist_std = y
-        config.dataset_config.scale_factor_std = z
-        train(config)
+    evaluate_multi("logs/speeds", 5)
+    # config = Config(
+    #     n_epoch=20,
+    #     dataset_config=PantomimeDatasetConfig(
+    #         envs=["office", "open", "industrial", "restaurant"],
+    #         angles=[0],
+    #         speeds=["normal"],
+    #         actions=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
+    #         translate_total_dist_std=0.1,
+    #         translate_point_dist_std=0.01,
+    #         scale_factor_std=0.1,
+    #     ),
+    #     backbone_config=PointNetPPMSGConfig(
+    #         set_abstractions=[
+    #             PointNetPPMSGConfig.SetAbstractionConfig(
+    #                 n_out_point=50,
+    #                 ball_query_n_sample=[8, 16, 32],
+    #                 ball_query_radius=[0.2, 0.4, 0.6],
+    #                 mlp_layers=[[3, 16, 32], [3, 16, 32], [3, 16, 32]],
+    #             ),
+    #             PointNetPPMSGConfig.SetAbstractionConfig(
+    #                 n_out_point=20,
+    #                 ball_query_n_sample=[16, 24, 32],
+    #                 ball_query_radius=[0.4, 0.8, 1.2],
+    #                 mlp_layers=[[3+32*3, 128, 256], [3+32*3, 128, 256], [3+32*3, 128, 256]],
+    #             ),
+    #         ],
+    #         final_mlp_layers=[3+256*3, 1024]
+    #     ),
+    #     classifier_config=ClassifierConfig(
+    #         rnn_config=ClassifierConfig.RNNConfig(
+    #             name="gru",
+    #             input_size=1024,
+    #             hidden_size=256,
+    #         ),
+    #         head_layers=[256, 64, 21],
+    #     ),
+    # )
+    # speeds = [
+    #     ["normal"],
+    #     ["slow", "normal", "fast"],
+    # ]
+    # for s in speeds:
+    #     print(s)
+    #     config.dataset_config.speeds = s
+    #     train(config)
